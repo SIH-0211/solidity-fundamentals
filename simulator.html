@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solidity Lab Simulator - Lab 1</title>
+    <style>
+        :root {
+            --bg-deep: #0a0e27;
+            --bg-surface: #111633;
+            --bg-elevated: #1a1f4a;
+            --neon-cyan: #00d4ff;
+            --neon-purple: #7c3aed;
+            --neon-green: #10b981;
+            --neon-orange: #f59e0b;
+            --neon-red: #ef4444;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --font-code: 'Consolas', 'Fira Code', monospace;
+            --font-ui: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            --shadow-neon: 0 0 10px rgba(0, 212, 255, 0.5);
+            --border-neon: 1px solid var(--neon-cyan);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-ui);
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+        }
+
+        /* Views */
+        .view {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            animation: fadeIn 0.5s ease-out;
+        }
+        .view.active {
+            display: flex;
+        }
+
+        /* Launcher */
+        #launcher {
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .launcher-card {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 30px;
+            width: 400px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+        .launcher-card:hover {
+            transform: translateY(-10px);
+            border: var(--border-neon);
+            box-shadow: var(--shadow-neon);
+        }
+        .launcher-card h2 {
+            color: var(--neon-cyan);
+            margin-bottom: 15px;
+        }
+        .metadata {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--neon-green);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .tags {
+            margin-top: 15px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        .tag {
+            background: rgba(124, 58, 237, 0.2);
+            color: var(--neon-purple);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        /* Lab Layout */
+        #lab1 {
+            flex-direction: column;
+        }
+        header {
+            height: 60px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--bg-elevated);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+        }
+        .btn {
+            background: var(--bg-elevated);
+            color: var(--text-main);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn:hover { background: rgba(255,255,255,0.1); }
+        .btn-cyan { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+        .btn-cyan:hover { box-shadow: var(--shadow-neon); background: rgba(0,212,255,0.1); }
+        
+        .main-workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 60px);
+        }
+        .panel {
+            background: var(--bg-surface);
+            border-right: 1px solid var(--bg-elevated);
+            display: flex;
+            flex-direction: column;
+        }
+        .col-left { width: 45%; }
+        .col-mid { width: 25%; }
+        .col-right { width: 30%; border-right: none; }
+        .panel-header {
+            padding: 10px 15px;
+            background: var(--bg-elevated);
+            font-weight: bold;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Editor */
+        .editor-container {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+            background: var(--bg-deep);
+            display: flex;
+        }
+        .line-numbers {
+            width: 40px;
+            background: var(--bg-elevated);
+            text-align: right;
+            padding: 15px 5px;
+            color: var(--text-muted);
+            font-family: var(--font-code);
+            font-size: 14px;
+            line-height: 1.5;
+            user-select: none;
+            overflow: hidden;
+        }
+        .editor-wrap {
+            position: relative;
+            flex: 1;
+            overflow: auto;
+        }
+        textarea.code-input, pre.code-output {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            margin: 0; padding: 15px;
+            font-family: var(--font-code);
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre;
+            border: none;
+            outline: none;
+            overflow: visible;
+        }
+        textarea.code-input {
+            color: transparent;
+            background: transparent;
+            caret-color: var(--neon-cyan);
+            z-index: 2;
+            resize: none;
+        }
+        pre.code-output {
+            z-index: 1;
+            pointer-events: none;
+        }
+        /* Syntax Colors */
+        .kw { color: var(--neon-cyan); }
+        .type { color: var(--neon-purple); }
+        .str { color: var(--neon-green); }
+        .num { color: var(--neon-orange); }
+        .comment { color: var(--text-muted); font-style: italic; }
+
+        /* Controls Panel */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--bg-elevated);
+            background: var(--bg-deep);
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 0.9em;
+            color: var(--text-muted);
+        }
+        .tab.active {
+            color: var(--neon-cyan);
+            border-bottom-color: var(--neon-cyan);
+        }
+        .guide-content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        .guide-content h3 { color: var(--neon-purple); margin-bottom: 10px; }
+        .guide-content ul { padding-left: 20px; list-style-type: square; }
+        .guide-content p { margin-bottom: 8px; }
+        .guide-content code { background: var(--bg-deep); padding: 2px 5px; border-radius: 4px; color: var(--neon-cyan);}
+        .action-buttons {
+            padding: 15px;
+            border-top: 1px solid var(--bg-elevated);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        /* Interaction Panel */
+        .interact-content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        #deploy-status { font-size: 0.9em; color: var(--text-muted); margin-bottom: 15px; }
+        .contract-ui {
+            background: var(--bg-deep);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .contract-ui h4 { margin-bottom: 10px; border-bottom: 1px solid var(--bg-elevated); padding-bottom: 5px;}
+        .func-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .func-input {
+            background: var(--bg-surface);
+            border: 1px solid var(--bg-elevated);
+            color: white;
+            padding: 6px;
+            border-radius: 4px;
+            flex: 1;
+            font-family: var(--font-code);
+        }
+        .btn-green { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--neon-green); color: var(--neon-green); }
+        .btn-green:hover { background: rgba(16, 185, 129, 0.4); }
+        .btn-orange { background: rgba(245, 158, 11, 0.2); border: 1px solid var(--neon-orange); color: var(--neon-orange); }
+        .btn-orange:hover { background: rgba(245, 158, 11, 0.4); }
+        
+        .state-vars-viewer {
+            margin-top: 20px;
+            padding: 10px;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+        }
+        .state-var { font-family: var(--font-code); font-size: 0.8em; margin-bottom: 5px; display:flex; justify-content: space-between;}
+
+        /* Console */
+        #console-wrapper {
+            position: absolute;
+            bottom: 0; right: 0; left: 0;
+            height: 200px;
+            background: var(--bg-elevated);
+            border-top: 1px solid var(--neon-purple);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+        #console-wrapper.open { transform: translateY(0); }
+        .console-header { background: var(--bg-surface); padding: 5px 15px; display: flex; justify-content: space-between; font-size: 0.8em; border-bottom: 1px solid rgba(255,255,255,0.05);}
+        .console-body { flex: 1; padding: 10px; overflow-y: auto; font-family: var(--font-code); font-size: 13px; }
+        .log-entry { margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;}
+        .log-success { color: var(--neon-green); }
+        .log-error { color: var(--neon-red); }
+        .log-info { color: var(--neon-cyan); }
+        .log-tx { color: var(--neon-orange); }
+
+        /* Toasts */
+        #toast-container {
+            position: fixed; top: 20px; right: 20px; z-index: 999;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .toast {
+            background: var(--bg-elevated);
+            border-left: 4px solid var(--neon-cyan);
+            padding: 12px 20px;
+            border-radius: 4px;
+            min-width: 250px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            animation: slideIn 0.3s ease-out;
+        }
+        .toast.success { border-color: var(--neon-green); }
+        .toast.error { border-color: var(--neon-red); }
+        .toast.warning { border-color: var(--neon-orange); }
+        
+        @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+        @keyframes slideIn { from{transform:translateX(100%);} to{transform:translateX(0);} }
+        @keyframes toastFadeOut { from{opacity:1; transform:translateY(0);} to{opacity:0; transform:translateY(-20px);} }
+        
+        /* Utility */
+        select.account-select {
+            background: var(--bg-deep);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 5px 10px;
+            border-radius: 4px;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Launcher View -->
+    <div id="launcher" class="view active">
+        <h1 style="color:white; margin-bottom: 40px;">Solidity Lab Simulator</h1>
+        <div class="launcher-card" onclick="app.loadLab(1)">
+            <h2><span style="font-size:1.5em">🔗</span> Lab 1: HelloWorld & HelloNumber</h2>
+            <p style="color: var(--text-muted)">블록체인 기초, 상태 변수 및 타입 학습</p>
+            <div class="metadata">
+                <span>난이도: ★☆☆</span>
+                <span>소요시간: ~15분</span>
+            </div>
+            <div class="tags">
+                <span class="tag">string</span>
+                <span class="tag">public</span>
+                <span class="tag">view</span>
+                <span class="tag">int</span>
+            </div>
+            <div class="progress-container">
+                <div id="launcher-progress" class="progress-bar"></div>
+            </div>
+        </div>
+        <p style="margin-top: 20px; color:var(--text-muted); font-size: 0.9em;">단축키: <code>1</code>키로 시작</p>
+    </div>
+
+    <!-- Lab 1 View -->
+    <div id="lab1" class="view">
+        <header>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button class="btn" onclick="app.showLauncher()">← 런처로 복귀</button>
+                <h3>Lab 1: 기초 실습</h3>
+            </div>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <span style="font-size: 0.9em; color: var(--text-muted);">계정:</span>
+                <select id="account-selector" class="account-select"></select>
+                <div style="font-size: 0.9em;">
+                    <span id="account-balance" style="color: var(--neon-green)">100</span> ETH
+                </div>
+            </div>
+        </header>
+
+        <div class="main-workspace">
+            <!-- Left: Editor -->
+            <div class="panel col-left">
+                <div class="panel-header">코드 에디터 <span id="cursor-pos" style="font-weight:normal; font-size:0.8em; color:var(--text-muted);">줄 1, 열 1</span></div>
+                <div class="editor-container">
+                    <div id="line-numbers" class="line-numbers">1</div>
+                    <div class="editor-wrap">
+                        <textarea id="code-input" class="code-input" spellcheck="false" 
+                            oninput="editor.onInput()" onscroll="editor.onScroll()" 
+                            onclick="editor.updateCursor()" onkeyup="editor.updateCursor()"></textarea>
+                        <pre id="code-output" class="code-output"></pre>
+                    </div>
+                </div>
+                <div style="padding: 10px; background: var(--bg-elevated); display: flex; justify-content: space-between;">
+                    <button class="btn" onclick="editor.resetCode()" style="font-size:0.8em">초기화</button>
+                    <span style="font-size: 0.8em; color: var(--text-muted);">자동 저장됨</span>
+                </div>
+            </div>
+
+            <!-- Middle: Controls -->
+            <div class="panel col-mid">
+                <div class="tabs">
+                    <div class="tab active" onclick="app.switchTab(0)">1. Hello</div>
+                    <div class="tab" onclick="app.switchTab(1)">2. Ext.</div>
+                    <div class="tab" onclick="app.switchTab(2)">3. Number</div>
+                </div>
+                <div id="guide-container" class="guide-content">
+                    <!-- Guide inserted via JS -->
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-cyan" onclick="compiler.compile()">컴파일 (Ctrl+Enter)</button>
+                    <button class="btn" id="btn-deploy" onclick="compiler.deploy()" disabled>배포 (Ctrl+Shift+D)</button>
+                </div>
+            </div>
+
+            <!-- Right: Interaction -->
+            <div class="panel col-right">
+                <div class="panel-header">인터랙션 패널</div>
+                <div id="interact-panel" class="interact-content">
+                    <div id="deploy-status">컨트랙트를 배포하세요.</div>
+                    <div id="contract-ui-container"></div>
+                    <div id="state-visualizer" class="state-vars-viewer" style="display:none;">
+                        <h5>가상 스토리지 상태</h5>
+                        <div id="state-vars-list" style="margin-top:10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logging Console -->
+        <div id="console-wrapper">
+            <div class="console-header">
+                <span>터미널 콘솔</span>
+                <div>
+                    <button onclick="logger.clear()" style="background:none; color:white; border:none; cursor:pointer;">Clear</button>
+                    <button onclick="app.toggleConsole()" style="background:none; color:white; border:none; cursor:pointer; margin-left:10px;">Close (Ctrl+`)</button>
+                </div>
+            </div>
+            <div id="console-body" class="console-body"></div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // Default codes for the tabs
+        const LAB_CODES = [
+`// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract HelloWorld {
+    string public greet = "Hello World";
+}`,
+
+`// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract HelloWorld {
+    string private _greeting = "Hello, World!";
+
+    function greet() public view returns (string memory) {
+        return _greeting;
+    }
+
+    function setGreeting(string memory newGreeting) public {
+        _greeting = newGreeting;
+    }
+}`,
+
+`// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract HelloNumber {
+    int public number = 10;
+}`
+        ];
+
+        const LAB_GUIDES = [
+            `<h3>HelloWorld 기본</h3><p>블록체인에 문자열을 저장해봅시다.</p>
+             <ol>
+                <li>코드를 확인하세요: <code>string public greet</code></li>
+                <li><strong>컴파일</strong> 버튼을 누르세요.</li>
+                <li><strong>배포</strong> 버튼을 누르세요.</li>
+                <li>우측 패널에서 생성된 <strong>greet</strong> 버튼을 클릭하세요!</li>
+             </ol>
+             <br><p><em>💡 힌트: <code>public</code> 변수는 자동으로 그 값을 읽어오는 getter 함수가 생성됩니다.</em></p>`,
+
+            `<h3>HelloWorld 확장</h3><p>public과 private의 차이를 알아봅시다.</p>
+             <ol>
+                <li><code>private</code> 변수와 <code>public view</code> 함수를 확인하세요.</li>
+                <li>컴파일 후 배포하세요.</li>
+                <li><code>greet()</code>를 먼저 호출해보세요.</li>
+                <li><code>setGreeting</code> 입력칸에 새 문구를 적고 호출하세요.</li>
+                <li>다시 <code>greet()</code>를 눌러 값이 변했는지 확인하세요!</li>
+             </ol>
+             <br><p><em>💡 힌트: 상태를 변경하는 함수는 가스(gas)를 소모합니다.</em></p>`,
+
+            `<h3>HelloNumber (도전과제)</h3>
+             <ol>
+                <li><code>int</code> 타입 변수를 확인하고 컴파일/배포하여 값을 읽어보세요.</li>
+                <li><strong>도전!</strong> 코드를 수정하여 다음을 만드세요:</li>
+             </ol>
+             <ul>
+                 <li><code>number</code>를 <code>private _number</code>로 변경</li>
+                 <li><code>getNumber()</code> public view 함수 생성</li>
+                 <li><code>setNumber(int newNumber)</code> public 함수 생성</li>
+             </ul>
+             <br><button class="btn btn-cyan" onclick="app.showHint()" style="font-size:0.8em; padding:4px 8px;">정답 코드 보기 및 적용</button>`
+        ];
+
+        // --- Mock Blockchain BlockchainEngine ---
+        const BlockchainEngine = {
+            blockNumber: 1,
+            gasPriceGwei: 20,
+            activeAccountIdx: 0,
+            accounts: [
+                { address: '0x5B38Da6a701c568545dCfcB03FcB875f56beddC4', balance: 100 },
+                { address: '0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2', balance: 100 },
+                { address: '0x4B20993Bc481177ec7E8f571ceCaE8A9e22C02db', balance: 100 },
+                { address: '0x78731D3Ca6b7E34aC0F824c42a7cC18A495cabaB', balance: 100 },
+                { address: '0x617F2E2fD72FD9D5503197092aC168c91465E7f2', balance: 100 },
+            ],
+            deployedState: null, // { name: string, vars: {} }
+            
+            getActive() { return this.accounts[this.activeAccountIdx]; },
+            deductGas(gasUsed) {
+                const ethRequired = (gasUsed * this.gasPriceGwei) / 1000000000;
+                this.getActive().balance -= ethRequired;
+                if(this.getActive().balance < 0) this.getActive().balance = 0;
+                document.getElementById('account-balance').innerText = this.getActive().balance.toFixed(4);
+                return ethRequired;
+            },
+            triggerTx() {
+                this.blockNumber++;
+                return "0x" + Math.random().toString(16).substr(2, 40);
+            }
+        };
+
+        // --- Logger / Toast System ---
+        const logger = {
+            log(msg, type='info') {
+                const b = document.getElementById('console-body');
+                const div = document.createElement('div');
+                div.className = `log-entry log-${type}`;
+                div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                b.appendChild(div);
+                b.scrollTop = b.scrollHeight;
+            },
+            clear() { document.getElementById('console-body').innerHTML = ''; },
+            toast(msg, type='info') {
+                const c = document.getElementById('toast-container');
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
+                const icon = type==='success'?'✅':(type==='error'?'❌':(type==='warning'?'⚠️':'ℹ️'));
+                t.innerHTML = `${icon} ${msg}`;
+                c.appendChild(t);
+                setTimeout(() => {
+                    t.style.animation = 'toastFadeOut 0.3s ease-in forwards';
+                    setTimeout(() => t.remove(), 300);
+                }, 3000);
+            }
+        };
+
+        // --- Editor Engine ---
+        const editor = {
+            elInput: document.getElementById('code-input'),
+            elOutput: document.getElementById('code-output'),
+            elLines: document.getElementById('line-numbers'),
+            tabIdx: 0,
+
+            init() {
+                this.elInput.addEventListener('keydown', e => {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const s = this.elInput.selectionStart;
+                        const v = this.elInput.value;
+                        this.elInput.value = v.substring(0, s) + "  " + v.substring(this.elInput.selectionEnd);
+                        this.elInput.selectionStart = this.elInput.selectionEnd = s + 2;
+                        this.onInput();
+                    }
+                });
+            },
+            loadCode(tIdx) {
+                this.tabIdx = tIdx;
+                let c = localStorage.getItem(`lab1_tab${tIdx}`);
+                if(!c) c = LAB_CODES[tIdx];
+                this.elInput.value = c;
+                this.onInput();
+            },
+            resetCode() {
+                this.elInput.value = LAB_CODES[this.tabIdx];
+                this.onInput();
+                logger.toast("코드가 초기화되었습니다.", "info");
+            },
+            onInput() {
+                const code = this.elInput.value;
+                // Auto save
+                localStorage.setItem(`lab1_tab${this.tabIdx}`, code);
+                
+                // Lines
+                const linesCount = code.split('\n').length;
+                this.elLines.innerHTML = Array.from({length: linesCount}, (_, i) => i+1).join('<br>');
+                
+                // Highlight
+                this.elOutput.innerHTML = this.highlight(code);
+                this.updateCursor();
+
+                // Reset compilation state
+                compiler.isCompiled = false;
+                document.getElementById('btn-deploy').disabled = true;
+                document.getElementById('deploy-status').innerText = '컨트랙트를 컴파일하세요.';
+                document.getElementById('contract-ui-container').innerHTML = '';
+                document.getElementById('state-visualizer').style.display = 'none';
+            },
+            onScroll() {
+                this.elOutput.scrollTop = this.elInput.scrollTop;
+                this.elLines.scrollTop = this.elInput.scrollTop;
+                this.elOutput.scrollLeft = this.elInput.scrollLeft;
+            },
+            updateCursor() {
+                const s = this.elInput.selectionStart;
+                const lines = this.elInput.value.substring(0, s).split('\n');
+                const row = lines.length;
+                const col = lines[lines.length-1].length + 1;
+                document.getElementById('cursor-pos').innerText = `줄 ${row}, 열 ${col}`;
+            },
+            highlight(code) {
+                let html = code
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                
+                // Comments
+                html = html.replace(/(\/\/.*)/g, '<span class="comment">$1</span>');
+                // Strings
+                html = html.replace(/(".*?")/g, '<span class="str">$1</span>');
+                // Numbers
+                html = html.replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+                
+                const kws = ['pragma','solidity','contract','function','returns','public','private','view','pure','if','else','return','require','revert', 'memory'];
+                kws.forEach(k => {
+                    html = html.replace(new RegExp(`\\b(${k})\\b`, 'g'), '<span class="kw">$1</span>');
+                });
+                const tps = ['string','int','uint','uint256','int256','bool','address','bytes'];
+                tps.forEach(t => {
+                    html = html.replace(new RegExp(`\\b(${t})\\b`, 'g'), '<span class="type">$1</span>');
+                });
+                return html;
+            }
+        };
+
+        // --- Mock Compiler/VM Engine ---
+        const compiler = {
+            isCompiled: false,
+            compiledData: null,
+            
+            compile() {
+                const code = editor.elInput.value;
+                const cntMatch = code.match(/contract\s+([a-zA-Z0-9_]+)\s*\{([\s\S]*)\}/);
+                
+                if(!cntMatch) {
+                    logger.toast("컴파일 오류: contract 키워드를 찾을 수 없습니다.", "error");
+                    logger.log("컴파일 실패", "error");
+                    return;
+                }
+                
+                const cName = cntMatch[1];
+                const cBody = cntMatch[2];
+                
+                let vars = [];
+                let funcs = [];
+                
+                // Extract Variables
+                // Matches format: type visibility name = value;
+                const varRegex = /(?:string|int)\s+(public|private)\s+([a-zA-Z0-9_]+)\s*(?:=\s*(.*?))?;/g;
+                let vMatch;
+                while((vMatch = varRegex.exec(cBody)) !== null) {
+                    let v = vMatch[3] ? vMatch[3].trim().replace(/['"]/g, '') : "";
+                    vars.push({ vis: vMatch[1], name: vMatch[2], val: v });
+                }
+                
+                // Extract Functions
+                const funcRegex = /function\s+([a-zA-Z0-9_]+)\s*\((.*?)\)\s+(public|private)\s*(view|pure|payable)?(?:\s*returns\s*\((.*?)\))?\s*\{([\s\S]*?)\}/g;
+                let fMatch;
+                while((fMatch = funcRegex.exec(cBody)) !== null) {
+                    const paramsRaw = fMatch[2].split(',').map(s=>s.trim()).filter(s=>s);
+                    // Params logic simplified for mock: "type memory paramName"
+                    const params = paramsRaw.map(p => {
+                        let parts = p.split(' ');
+                        return parts[parts.length-1];
+                    });
+                    
+                    funcs.push({
+                        name: fMatch[1],
+                        params: params,
+                        vis: fMatch[3],
+                        mut: fMatch[4] || '',
+                        ret: fMatch[5] || '',
+                        body: fMatch[6].trim()
+                    });
+                }
+                
+                this.compiledData = { name: cName, vars, funcs };
+                this.isCompiled = true;
+                
+                document.getElementById('btn-deploy').disabled = false;
+                logger.toast(`컴파일 성공: ${cName}`, "success");
+                logger.log(`[Compile] ${cName} (Variables: ${vars.length}, Functions: ${funcs.length})`, "success");
+                document.getElementById('deploy-status').innerText = '이제 배포할 수 있습니다.';
+            },
+            
+            deploy() {
+                if(!this.isCompiled) return;
+                
+                // Initialize VM state
+                BlockchainEngine.deployedState = JSON.parse(JSON.stringify(this.compiledData));
+                
+                const dData = BlockchainEngine.deployedState;
+                const gas = 21000 + Math.floor(Math.random()*50000);
+                const cost = BlockchainEngine.deductGas(gas);
+                const txHash = BlockchainEngine.triggerTx();
+                
+                logger.log(`[Deploy Tx] ${txHash} (Gas: ${cost.toFixed(6)} ETH) - ${dData.name}`, "tx");
+                logger.toast(`컨트랙트 배포 완료! (${dData.name})`, "success");
+                
+                document.getElementById('deploy-status').innerHTML = `
+                    <span style="color:var(--neon-green)">배포 성공: 0x...</span><br>
+                    <small>최신 블록: ${BlockchainEngine.blockNumber}</small>
+                `;
+                
+                this.renderUI();
+                this.renderVisualizer();
+            },
+            
+            renderUI() {
+                const c = document.getElementById('contract-ui-container');
+                const state = BlockchainEngine.deployedState;
+                c.innerHTML = `<div class="contract-ui"><h4>${state.name}</h4><div id="func-list"></div></div>`;
+                const list = document.getElementById('func-list');
+                
+                // 1. Render Public vars as Getters
+                state.vars.forEach(v => {
+                    if(v.vis === 'public') {
+                        list.innerHTML += `
+                            <div class="func-row">
+                                <button class="btn btn-green" onclick="compiler.callFunc('${v.name}', [], true)" style="min-width:120px;">${v.name}</button>
+                                <span style="font-size:0.8em; color:var(--text-muted);" id="res-${v.name}"></span>
+                            </div>`;
+                    }
+                });
+                
+                // 2. Render Public functions
+                state.funcs.forEach(f => {
+                    if(f.vis === 'public') {
+                        const isView = (f.mut === 'view' || f.mut === 'pure');
+                        const btnClass = isView ? 'btn-green' : 'btn-orange';
+                        
+                        let inputsHtml = f.params.map(p => `<input type="text" class="func-input" id="inp-${f.name}-${p}" placeholder="${p}">`).join('');
+                        
+                        list.innerHTML += `
+                            <div class="func-row">
+                                <button class="btn ${btnClass}" onclick="compiler.callFunc('${f.name}', [${f.params.map(p=>`'${p}'`).join(',')}], false, ${isView})" style="min-width:120px;">${f.name}</button>
+                                ${inputsHtml}
+                            </div>
+                            <div style="font-size:0.8em; color:var(--text-muted); margin-bottom:10px; margin-left: 130px;" id="res-${f.name}"></div>`;
+                    }
+                });
+            },
+            
+            callFunc(fName, paramNames, isGetter, isView) {
+                const state = BlockchainEngine.deployedState;
+                const outputEl = document.getElementById(`res-${fName}`);
+                
+                if(isGetter) {
+                    const vInfo = state.vars.find(vv => vv.name === fName);
+                    // view call -> no gas
+                    outputEl.innerText = `반환: ${vInfo.val}`;
+                    logger.log(`[Call] ${fName}() -> ${vInfo.val} (가스 무료)`, "info");
+                    app.checkProgress();
+                    return;
+                }
+                
+                const funcDef = state.funcs.find(ff => ff.name === fName);
+                if(!funcDef) return;
+                
+                // Get parameter values
+                const pValues = paramNames.map(pName => document.getElementById(`inp-${fName}-${pName}`).value);
+                
+                let resOutput = "";
+                let body = funcDef.body;
+                
+                if (isView) {
+                    // Match return STATEMENT
+                    const retMatch = body.match(/return\s+([a-zA-Z0-9_]+)\s*;/);
+                    if(retMatch) {
+                        const targetVar = state.vars.find(vv => vv.name === retMatch[1]);
+                        resOutput = targetVar ? targetVar.val : "<알수없음>";
+                    } else if (body.includes("return ")) {
+                        // Hardcoded string/num return
+                        resOutput = body.split('return')[1].replace(/[;]/g,'').trim().replace(/['"]/g, '');
+                    }
+                    outputEl.innerText = `반환: ${resOutput}`;
+                    logger.log(`[Call] ${fName}() -> ${resOutput} (가스 무료)`, "info");
+                } else {
+                    // State changing mock
+                    const gas = 21000 + Math.floor(Math.random()*10000);
+                    const cost = BlockchainEngine.deductGas(gas);
+                    const txHash = BlockchainEngine.triggerTx();
+                    
+                    // Mock assignment statement checking
+                    // `_greeting = newGreeting;`
+                    const assignMatch = body.match(/([a-zA-Z0-9_]+)\s*=\s*([a-zA-Z0-9_]+)\s*;/);
+                    if (assignMatch) {
+                        const tVar = state.vars.find(vv => vv.name === assignMatch[1]);
+                        // simple match: if assigned value matches param name
+                        const paramIdx = paramNames.indexOf(assignMatch[2]);
+                        if (tVar && paramIdx >= 0) {
+                            tVar.val = pValues[paramIdx];
+                        } else if (tVar) {
+                            // Backup directly assign first param
+                            tVar.val = pValues[0];
+                        }
+                    }
+                    this.renderVisualizer();
+                    outputEl.innerHTML = `<span style="color:var(--neon-orange)">Tx: ${txHash.substring(0,10)}... 가스: ${gas}</span>`;
+                    logger.log(`[Tx] ${fName}() -> 성공 (가스 사용: ${gas}) Hash: ${txHash}`, "tx");
+                    logger.toast(`트랜잭션 실행됨: ${fName}`, "warning");
+                }
+                app.checkProgress();
+            },
+            
+            renderVisualizer() {
+                const c = document.getElementById('state-visualizer');
+                c.style.display = 'block';
+                const list = document.getElementById('state-vars-list');
+                list.innerHTML = BlockchainEngine.deployedState.vars.map(v => 
+                    `<div class="state-var">
+                        <span><span style="color:var(--neon-purple)">${v.vis}</span> ${v.name}</span>
+                        <strong style="color:var(--neon-green)">${v.val}</strong>
+                     </div>`
+                ).join('');
+            }
+        };
+
+        // --- Main App Logic ---
+        const app = {
+            currentLab: 1,
+            init() {
+                editor.init();
+                
+                // Account setup
+                const sel = document.getElementById('account-selector');
+                BlockchainEngine.accounts.forEach((acc, i) => {
+                    sel.innerHTML += `<option value="${i}">${acc.address.substring(0,8)}... (${acc.balance} ETH)</option>`;
+                });
+                sel.addEventListener('change', (e) => {
+                    BlockchainEngine.activeAccountIdx = parseInt(e.target.value);
+                    document.getElementById('account-balance').innerText = BlockchainEngine.getActive().balance.toFixed(4);
+                });
+                
+                this.updateLauncherProgress();
+                
+                // Routing Based on Hash
+                window.addEventListener('hashchange', () => this.handleHashRoute());
+                if(!window.location.hash) window.location.hash = "#launcher";
+                this.handleHashRoute();
+                
+                // Shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if(e.key === '1' && window.location.hash === '#launcher') {
+                        this.loadLab(1);
+                    }
+                    if(e.key === 'Escape' && window.location.hash === '#lab1') {
+                        this.showLauncher();
+                    }
+                    if(e.ctrlKey && e.key === 'Enter') {
+                        compiler.compile();
+                    }
+                    if(e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+                        e.preventDefault();
+                        compiler.deploy();
+                    }
+                    if(e.ctrlKey && e.key === '`') {
+                        this.toggleConsole();
+                    }
+                });
+                
+                // Canvas animation setup
+                bgCanvas.init();
+            },
+            
+            handleHashRoute() {
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                const hash = window.location.hash || '#launcher';
+                document.querySelector(hash).classList.add('active');
+                if(hash === '#lab1') {
+                    this.switchTab(0);
+                    bgCanvas.pause();
+                } else {
+                    bgCanvas.resume();
+                }
+            },
+            showLauncher() { window.location.hash = "#launcher"; this.updateLauncherProgress(); },
+            loadLab(n) { this.currentLab = n; window.location.hash = "#lab1"; },
+            
+            switchTab(idx) {
+                document.querySelectorAll('.tab').forEach((t, i) => {
+                    t.classList.toggle('active', i === idx);
+                });
+                document.getElementById('guide-container').innerHTML = LAB_GUIDES[idx];
+                editor.loadCode(idx);
+            },
+            
+            toggleConsole() {
+                const c = document.getElementById('console-wrapper');
+                c.classList.toggle('open');
+            },
+            
+            checkProgress() {
+                // simple progression marker
+                let p = parseInt(localStorage.getItem('lab1_progress') || "0");
+                if (editor.tabIdx === 2 && p < 3) p = 3;
+                else if (editor.tabIdx === 1 && p < 2) p = 2;
+                else if (editor.tabIdx === 0 && p < 1) p = 1;
+                localStorage.setItem('lab1_progress', p);
+            },
+            updateLauncherProgress() {
+                let p = parseInt(localStorage.getItem('lab1_progress') || "0");
+                const pct = (p / 3) * 100;
+                document.getElementById('launcher-progress').style.width = `${pct}%`;
+            },
+            
+            showHint() {
+                editor.elInput.value = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+contract HelloNumber {
+    int private _number = 10;
+
+    function getNumber() public view returns (int) {
+        return _number;
+    }
+
+    function setNumber(int newNumber) public {
+        _number = newNumber;
+    }
+}`;
+                editor.onInput();
+                logger.toast("도전과제 정답 코드가 적용되었습니다.", "success");
+            }
+        };
+
+        // --- Background Canvas Engine ---
+        const bgCanvas = {
+            canvas: document.getElementById('bg-canvas'),
+            ctx: null,
+            particles: [],
+            isPaused: false,
+            
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
+                for(let i=0; i<100; i++) {
+                    this.particles.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        s: Math.random() * 2 + 0.5,
+                        d: Math.random() * Math.PI * 2,
+                        v: Math.random() * 0.5 + 0.1
+                    });
+                }
+                this.animate();
+            },
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            },
+            pause() { this.isPaused = true; },
+            resume() { this.isPaused = false; },
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if(this.isPaused) return;
+                
+                this.ctx.fillStyle = '#0a0e27';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
+                this.particles.forEach(p => {
+                    p.x += Math.cos(p.d) * p.v;
+                    p.y += Math.sin(p.d) * p.v;
+                    
+                    if(p.x < 0) p.x = this.canvas.width;
+                    if(p.x > this.canvas.width) p.x = 0;
+                    if(p.y < 0) p.y = this.canvas.height;
+                    if(p.y > this.canvas.height) p.y = 0;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.s, 0, Math.PI*2);
+                    this.ctx.fill();
+                });
+            }
+        };
+
+        // Boot
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
